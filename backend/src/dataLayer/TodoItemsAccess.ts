@@ -7,7 +7,9 @@ const XAWS = AWSXRay.captureAWS(AWS);
 
 import { TodoItem } from "../models/TodoItem";
 import { TodoUpdate } from "../models/TodoUpdate";
+import { AttachmentsAccess } from "./AttachmentsAccess";
 
+const attachmentsAccess = new AttachmentsAccess()
 export class TodoItemsAccess {
   constructor(
     private readonly docClient: DocumentClient = createDynamoDBClient(),
@@ -31,9 +33,15 @@ export class TodoItemsAccess {
     if (nextPage != undefined) params["ExclusiveStartKey"] = nextPage;
     const result = await this.docClient.query(params).promise();
 
-    const items = result.Items;
+    const items = result.Items as TodoItem[];
+    for (const item of items) {
+      const todoId = item.todoId
+      if (todoId && (await attachmentsAccess.fileExists(todoId))) {
+        item.attachmentUrl = attachmentsAccess.getDownloadUrl(todoId)
+      }
+    }
     return {
-      items: items as TodoItem[],
+      items: items,
       nextPage: result.LastEvaluatedKey,
     };
   }
